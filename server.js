@@ -85,6 +85,11 @@ async function main() {
     });
 
     // 认证 API (POST)
+    app.get('/register', (req, res) => {
+        if (req.session.isLoggedIn) return res.redirect('/'); // 如果已登录，直接跳转到主页
+        res.sendFile(path.join(__dirname, 'public', 'register.html'));
+    });
+
     app.post('/register', verifyTurnstile, async (req, res) => {
         const { username, password } = req.body;
         if (!username || !password) {

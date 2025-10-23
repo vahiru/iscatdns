@@ -1,6 +1,7 @@
+// Function to render the Turnstile widget
 async function renderTurnstile() {
     const widget = document.getElementById('turnstile-widget');
-    if (widget) {
+    if (widget && typeof turnstile !== 'undefined') {
         try {
             const response = await fetch('/api/turnstile-sitekey');
             if (response.ok) {
@@ -49,11 +50,23 @@ function setRandomBackground() {
     }
 }
 
+// This function will be called by the Turnstile script once it's loaded
+function onloadTurnstileCallback() {
+    renderTurnstile();
+}
+
+// Dynamically load the Turnstile script
+function loadTurnstileScript() {
+    const script = document.createElement('script');
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onloadTurnstileCallback';
+    script.async = true;
+    script.defer = true;
+    document.head.appendChild(script);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     fetchBackgroundImages();
-    // Manually render Turnstile if the widget exists and turnstile object is available
-    const turnstileWidget = document.getElementById('turnstile-widget');
-    if (turnstileWidget && typeof turnstile !== 'undefined') {
-        renderTurnstile();
+    if (document.getElementById('turnstile-widget')) {
+        loadTurnstileScript();
     }
 });
