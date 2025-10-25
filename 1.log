@@ -1,0 +1,27 @@
+Bot received message: {
+  "message_id": 8,
+  "from": {
+    "id": 6465508212,
+    "is_bot": false,
+    "first_name": "vahiru",
+    "last_name": "| 重度失眠",
+    "username": "vahiru",
+    "language_code": "zh-hans"
+  },
+  "chat": {
+    "id": 6465508212,
+    "first_name": "vahiru",
+    "last_name": "| 重度失眠",
+    "username": "vahiru",
+    "type": "private"
+  },
+  "date": 1761427386,
+  "text": "/bind 53b129c6924f6067a4bb457c363c76c8",
+  "entities": [
+    {
+      "offset": 0,
+      "length": 5,
+      "type": "bot_command"
+    }
+  ]
+}

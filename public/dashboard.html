@@ -19,9 +19,31 @@
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" aria-current="page" href="#my-records">我的记录</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#my-applications">我的申请</a>
+                    </li>
+                    <li class="nav-item dropdown d-none" id="adminNavDropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownAdmin" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            管理员面板
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="navbarDropdownAdmin">
+                            <li><a class="dropdown-item" href="#admin-users">所有用户</a></li>
+                            <li><a class="dropdown-item" href="#admin-dns-records">所有DNS记录</a></li>
+                            <li><a class="dropdown-item" href="#admin-applications">所有申请</a></li>
+                            <li><a class="dropdown-item" href="#admin-abuse-reports">滥用举报</a></li>
+                        </ul>
+                    </li>
+                </ul>
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="#" id="logoutButton">退出登录</a>
+                        <span class="nav-link text-light" id="loggedInUser"></span>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" id="logoutButton">退出登录">退出登录</a>
                     </li>
                 </ul>
             </div>
@@ -30,69 +52,66 @@
 
     <div class="container my-4">
         <header class="mb-4">
-            <h1 class="text-center">DNS 记录管理</h1>
+            <h1 class="text-center">DNS 管理仪表盘</h1>
         </header>
 
-        <div class="card mb-4">
+        <!-- Apply for Subdomain Section -->
+        <section id="apply-subdomain" class="card mb-4">
             <div class="card-header">
-                添加新记录
+                申请/更新二级域名
             </div>
             <div class="card-body">
-                <form id="addRecordForm" class="row g-3">
+                <form id="applicationForm" class="row g-3">
                     <div class="col-md-4">
-                        <label for="recordType" class="form-label">类型</label>
-                        <select class="form-select" id="recordType" name="type" required>
+                        <label for="appRecordType" class="form-label">类型</label>
+                        <select class="form-select" id="appRecordType" name="type" required>
                             <option value="A">A</option>
-                            <option value="AAAA">AAAA</option>
                             <option value="CNAME">CNAME</option>
-                            <option value="MX">MX</option>
-                            <option value="TXT">TXT</option>
-                            <option value="NS">NS</option>
                         </select>
                     </div>
                     <div class="col-md-4">
-                        <label for="recordName" class="form-label">名称 (子域名)</label>
-                        <input type="text" class="form-control" id="recordName" name="name" placeholder="例如: www 或 @" required>
+                        <label for="appRecordName" class="form-label">名称 (子域名)</label>
+                        <input type="text" class="form-control" id="appRecordName" name="name" placeholder="例如: www 或 @" required>
                     </div>
                     <div class="col-md-4">
-                        <label for="recordContent" class="form-label">内容 (IP 地址/目标)</label>
-                        <input type="text" class="form-control" id="recordContent" name="content" placeholder="例如: 192.168.1.1 或 example.com" required>
+                        <label for="appRecordContent" class="form-label">内容 (IP 地址/目标)</label>
+                        <input type="text" class="form-control" id="appRecordContent" name="content" placeholder="例如: 192.168.1.1 或 example.com" required>
                     </div>
                     <div class="col-12">
-                        <button type="submit" class="btn btn-primary">添加记录</button>
+                        <label for="appPurpose" class="form-label">申请用途 (必填)</label>
+                        <textarea class="form-control" id="appPurpose" name="purpose" rows="3" placeholder="请详细说明您申请此域名的用途，这将有助于管理员审批。" required></textarea>
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary">提交申请</button>
                     </div>
                 </form>
+                <div id="applicationFormMessage" class="mt-3"></div>
             </div>
-        </div>
+        </section>
 
-        <div class="card mb-4">
+        <!-- Bind Telegram Section (for admins, hidden by default) -->
+        <section id="bind-telegram-section" class="card mb-4 d-none">
             <div class="card-header">
-                子域名委派 (NS 记录)
+                绑定您的 Telegram 账户
             </div>
             <div class="card-body">
-                <form id="delegateForm" class="row g-3">
-                    <div class="col-md-6">
-                        <label for="delegateSubdomain" class="form-label">子域名</label>
-                        <input type="text" class="form-control" id="delegateSubdomain" name="subdomain" placeholder="例如: dev" required>
-                    </div>
-                    <div class="col-md-6">
-                        <label for="nameservers" class="form-label">NS 服务器 (多个用逗号分隔)</label>
-                        <input type="text" class="form-control" id="nameservers" name="nameservers" placeholder="例如: ns1.example.com,ns2.example.com" required>
-                    </div>
-                    <div class="col-12">
-                        <button type="submit" class="btn btn-info">委派子域名</button>
-                    </div>
-                </form>
+                <p>要参与投票和接收管理通知，您需要将您的网站账户与您的 Telegram 账户绑定。</p>
+                <button id="generateTokenBtn" class="btn btn-info">为我生成一个绑定令牌</button>
+                <div id="tokenDisplay" class="mt-3 d-none">
+                    <p>请复制以下命令，并私聊您的机器人发送：</p>
+                    <pre class="bg-light p-3 rounded"><code>/bind &lt;token&gt;</code></pre>
+                </div>
             </div>
-        </div>
+        </section>
 
-        <div class="card">
+        <!-- My DNS Records Section -->
+        <section id="my-records" class="card mb-4">
             <div class="card-header">
-                现有 DNS 记录
+                我的 DNS 记录
             </div>
             <div class="card-body">
                 <div class="mb-3">
-                    <input type="text" class="form-control" id="searchRecords" placeholder="搜索记录...">
+                    <input type="text" class="form-control" id="searchMyRecords" placeholder="搜索我的记录...">
                 </div>
                 <div class="table-responsive">
                     <table class="table table-striped table-hover">
@@ -106,8 +125,7 @@
                                 <th>操作</th>
                             </tr>
                         </thead>
-                        <tbody id="dnsRecordsTableBody">
-                            <!-- DNS records will be loaded here by JavaScript -->
+                        <tbody id="myDnsRecordsTableBody">
                             <tr>
                                 <td colspan="6" class="text-center">加载中...</td>
                             </tr>
@@ -115,8 +133,176 @@
                     </table>
                 </div>
             </div>
+        </section>
+
+        <!-- My Applications Section -->
+        <section id="my-applications" class="card mb-4">
+            <div class="card-header">
+                我的申请记录
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>类型</th>
+                                <th>域名</th>
+                                <th>值</th>
+                                <th>用途</th>
+                                <th>状态</th>
+                                <th>提交时间</th>
+                            </tr>
+                        </thead>
+                        <tbody id="myApplicationsTableBody">
+                            <tr>
+                                <td colspan="6" class="text-center">加载中...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Admin Panel Sections (conditionally rendered) -->
+        <div id="adminPanel" class="d-none">
+            <h2 class="text-center my-5">管理员面板</h2>
+
+            <!-- All Users -->
+            <section id="admin-users" class="card mb-4">
+                <div class="card-header">
+                    所有用户
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>用户名</th>
+                                    <th>邮箱</th>
+                                    <th>角色</th>
+                                    <th>TG ID</th>
+                                    <th>注册时间</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adminUsersTableBody">
+                                <tr>
+                                    <td colspan="6" class="text-center">加载中...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- All DNS Records -->
+            <section id="admin-dns-records" class="card mb-4">
+                <div class="card-header">
+                    所有 DNS 记录
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <input type="text" class="form-control" id="searchAllRecords" placeholder="搜索所有记录...">
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>用户</th>
+                                    <th>类型</th>
+                                    <th>名称</th>
+                                    <th>内容</th>
+                                    <th>TTL</th>
+                                    <th>代理</th>
+                                    <th>创建时间</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adminDnsRecordsTableBody">
+                                <tr>
+                                    <td colspan="7" class="text-center">加载中...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- All Applications -->
+            <section id="admin-applications" class="card mb-4">
+                <div class="card-header">
+                    所有申请
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <input type="text" class="form-control" id="searchAllApplications" placeholder="搜索所有申请...">
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>申请人</th>
+                                    <th>类型</th>
+                                    <th>域名</th>
+                                    <th>值</th>
+                                    <th>用途</th>
+                                    <th>状态</th>
+                                    <th>提交时间</th>
+                                    <th>截止时间</th>
+                                    <th>TG消息ID</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adminApplicationsTableBody">
+                                <tr>
+                                    <td colspan="10" class="text-center">加载中...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Abuse Reports -->
+            <section id="admin-abuse-reports" class="card mb-4">
+                <div class="card-header">
+                    滥用举报
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <input type="text" class="form-control" id="searchAbuseReports" placeholder="搜索举报...">
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>被举报域名</th>
+                                    <th>原因</th>
+                                    <th>详情</th>
+                                    <th>IP</th>
+                                    <th>状态</th>
+                                    <th>提交时间</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adminAbuseReportsTableBody">
+                                <tr>
+                                    <td colspan="8" class="text-center">加载中...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
         </div>
     </div>
+
+    <footer class="text-center text-muted py-4 mt-5">
+        <div class="container">
+            <p>&copy; 2024 is-cute.cat DNS. All Rights Reserved.</p>
+            <p><a href="/report-abuse">举报滥用</a></p>
+        </div>
+    </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
