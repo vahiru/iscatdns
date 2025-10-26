@@ -6,7 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js",
-    "setup:admin": "node setup-admin.js"
+    "setup:admin": "node setup-admin.js",
+    "maintenance": "node maintenance-tool.js"
   },
   "keywords": [],
   "author": "",
