@@ -88,6 +88,17 @@ function getVerificationEmail(token, domain) {
     `;
 }
 
+function getResetPasswordEmail(token, domain) {
+    const resetLink = `${domain}/reset-password?token=${token}`;
+    return `
+        <h1>重置您的密码</h1>
+        <p>我们收到了一个重置您账户密码的请求。请点击下方链接来设置新密码：</p>
+        <p><a href="${resetLink}">${resetLink}</a></p>
+        <p>此链接将在1小时后失效。</p>
+        <p>如果您没有请求重置密码，请忽略此邮件。</p>
+    `;
+}
+
 module.exports = {
     initializeEmailTransporter,
     sendEmail,
@@ -95,5 +106,6 @@ module.exports = {
     getApplicationApprovedEmail,
     getApplicationRejectedEmail,
     getApplicationExpiredEmail,
-    getVerificationEmail
+    getVerificationEmail,
+    getResetPasswordEmail
 };

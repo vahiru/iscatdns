@@ -66,6 +66,16 @@ async function initializeDatabase() {
             }
         });
 
+        // Add password reset columns if they don't exist
+        await db.all(`PRAGMA table_info(users)`).then(async columns => {
+            if (!columns.some(col => col.name === 'password_reset_token')) {
+                await db.exec(`ALTER TABLE users ADD COLUMN password_reset_token TEXT;`);
+            }
+            if (!columns.some(col => col.name === 'password_reset_token_expires_at')) {
+                await db.exec(`ALTER TABLE users ADD COLUMN password_reset_token_expires_at DATETIME;`);
+            }
+        });
+
         // --- dns_records table (no changes needed, but ensure it exists) ---
         await db.exec(`
             CREATE TABLE IF NOT EXISTS dns_records (

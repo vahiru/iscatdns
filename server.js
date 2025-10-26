@@ -141,6 +141,65 @@ async function main() {
         res.sendFile(path.join(__dirname, 'public', 'register.html'));
     });
 
+    app.get('/forgot-password', (req, res) => {
+        res.sendFile(path.join(__dirname, 'public', 'forgot-password.html'));
+    });
+
+    app.post('/forgot-password', verifyTurnstile, async (req, res) => {
+        const { email } = req.body;
+        if (!email) {
+            return res.status(400).json({ message: '邮箱地址不能为空。' });
+        }
+        try {
+            const user = await db.get('SELECT * FROM users WHERE email = ? AND is_verified = TRUE', email);
+            if (user) {
+                const token = require('crypto').randomBytes(32).toString('hex');
+                const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+                await db.run('UPDATE users SET password_reset_token = ?, password_reset_token_expires_at = ? WHERE id = ?', token, expiresAt.toISOString(), user.id);
+
+                const domain = `${req.protocol}://${req.get('host')}`;
+                const emailBody = getResetPasswordEmail(token, domain);
+                await sendEmail(email, "重置您的密码", emailBody);
+            }
+            // Always send a success message to prevent email enumeration attacks
+            res.status(200).json({ message: '如果您的邮箱已注册，您将会收到一封密码重置邮件。' });
+        } catch (error) {
+            console.error("请求重置密码失败:", error);
+            res.status(500).json({ message: '服务器内部错误。' });
+        }
+    });
+
+    app.get('/reset-password', (req, res) => {
+        res.sendFile(path.join(__dirname, 'public', 'reset-password.html'));
+    });
+
+    app.post('/reset-password', verifyTurnstile, async (req, res) => {
+        const { token, password, confirmPassword } = req.body;
+        if (!token || !password || !confirmPassword) {
+            return res.status(400).json({ message: '所有字段均为必填项。' });
+        }
+        if (password !== confirmPassword) {
+            return res.status(400).json({ message: '两次输入的密码不匹配。' });
+        }
+
+        try {
+            const user = await db.get('SELECT * FROM users WHERE password_reset_token = ? AND datetime(password_reset_token_expires_at) > datetime("now")', token);
+            if (!user) {
+                return res.status(400).json({ message: '无效或已过期的重置令牌。' });
+            }
+
+            const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+            await db.run('UPDATE users SET password = ?, password_reset_token = NULL, password_reset_token_expires_at = NULL WHERE id = ?', hashedPassword, user.id);
+
+            res.status(200).json({ success: true, message: '密码重置成功！您现在可以使用新密码登录了。' });
+
+        } catch (error) {
+            console.error("重置密码失败:", error);
+            res.status(500).json({ message: '服务器内部错误。' });
+        }
+    });
+
     app.post('/register', verifyTurnstile, async (req, res) => {
         const { username, password, email } = req.body;
         if (!username || !password || !email) {

@@ -58,6 +58,51 @@ async function formatApplicationMessage(application, votes = []) {
 `;
 }
 
+async function processApplication(applicationId, decisionReason, finalStatus) {
+    const app = await getApplicationDetails(applicationId);
+    if (!app || app.status !== 'pending') return; // Already processed
+
+    await db.run("UPDATE subdomain_applications SET status = ?, admin_notes = ? WHERE id = ?", finalStatus, decisionReason, applicationId);
+    
+    const user = await db.get("SELECT email FROM users WHERE id = ?", app.user_id);
+    if (!user) return;
+
+    if (finalStatus === 'approved') {
+        try {
+            if (app.request_type === 'create') {
+                const cfPayload = { type: app.record_type, name: app.subdomain, content: app.record_value, ttl: 3600, proxied: false };
+                const { data: cfResponse } = await cfApi.post('dns_records', cfPayload);
+                await db.run('INSERT INTO dns_records (id, user_id, type, name, content) VALUES (?, ?, ?, ?, ?)', cfResponse.result.id, app.user_id, app.record_type, app.subdomain, app.record_value);
+            } else if (app.request_type === 'update') {
+                const oldRecord = await db.get("SELECT * FROM dns_records WHERE id = ?", app.target_dns_record_id);
+                if (oldRecord) {
+                    const cfPayload = { type: app.record_type, name: app.subdomain, content: app.record_value, ttl: 3600, proxied: false };
+                    await cfApi.put(`dns_records/${oldRecord.id}`, cfPayload);
+                    await db.run('UPDATE dns_records SET type = ?, name = ?, content = ? WHERE id = ?', app.record_type, app.subdomain, app.record_value, app.target_dns_record_id);
+                }
+            }
+            await sendEmail(user.email, `您的域名申请已批准: ${app.subdomain}`, getApplicationApprovedEmail(app.subdomain));
+        } catch (error) {
+            console.error(`Cloudflare API op failed for approved app ${app.id}:`, error.response ? error.response.data : error.message);
+            await db.run("UPDATE subdomain_applications SET status = 'error', admin_notes = ? WHERE id = ?", "Cloudflare操作失败", app.id);
+            await sendEmail(user.email, `您的域名申请处理失败: ${app.subdomain}`, getApplicationRejectedEmail(app.subdomain, "后台Cloudflare操作失败，请联系管理员。"));
+            decisionReason = "❌ 投票通过但Cloudflare操作失败！";
+        }
+    } else if (finalStatus === 'rejected') {
+        await sendEmail(user.email, `您的域名申请已被拒绝: ${app.subdomain}`, getApplicationRejectedEmail(app.subdomain, decisionReason));
+    } else if (finalStatus === 'expired') {
+        await sendEmail(user.email, `您的域名申请已过期: ${app.subdomain}`, getApplicationExpiredEmail(app.subdomain));
+    }
+
+    const votes = await getVotesForApplication(app.id);
+    const originalMessage = await formatApplicationMessage(app, votes);
+    const finalMessage = originalMessage.replace(`*状态*: pending`, `*状态*: ${finalStatus}`) + `\n\n*处理结果: ${decisionReason}*`;
+    if (app.telegram_message_id) {
+        await editTelegramMessage(TELEGRAM_GROUP_CHAT_ID, app.telegram_message_id, finalMessage, {}); // Remove buttons
+    }
+    console.log(`Application ${app.id} processed with status: ${finalStatus}`);
+}
+
 // --- Bot Action Handlers ---
 async function handleVote(callbackQuery) {
     const fromId = callbackQuery.from.id.toString();
@@ -85,8 +130,21 @@ async function handleVote(callbackQuery) {
         );
 
         const votes = await getVotesForApplication(applicationId);
-        const messageText = await formatApplicationMessage(application, votes);
+        const approveVotesCount = votes.filter(v => v.vote_type === 'approve').length;
+        const denyVotesCount = votes.filter(v => v.vote_type === 'deny').length;
 
+        // Fast-track logic
+        if (approveVotesCount >= 2) {
+            await processApplication(applicationId, `快速通道批准 (赞成: ${approveVotesCount}, 反对: ${denyVotesCount})`, 'approved');
+            return bot.answerCallbackQuery(callbackQuery.id, { text: "已快速批准此申请。" });
+        }
+        if (denyVotesCount >= 2) {
+            await processApplication(applicationId, `快速通道拒绝 (赞成: ${approveVotesCount}, 反对: ${denyVotesCount})`, 'rejected');
+            return bot.answerCallbackQuery(callbackQuery.id, { text: "已快速拒绝此申请。" });
+        }
+
+        // Update message if not fast-tracked
+        const messageText = await formatApplicationMessage(application, votes);
         await editTelegramMessage(callbackQuery.message.chat.id, callbackQuery.message.message_id, messageText, {
             reply_markup: {
                 inline_keyboard: [
@@ -146,56 +204,13 @@ function startCronJobs() {
             const approveVotes = votes.filter(v => v.vote_type === 'approve').length;
             const denyVotes = votes.filter(v => v.vote_type === 'deny').length;
 
-            let finalStatus = 'expired';
-            let decisionReason = "投票超时，无人投票。";
-
-            if (approveVotes > denyVotes) {
-                finalStatus = 'approved';
-                decisionReason = `投票通过 (赞成: ${approveVotes}, 反对: ${denyVotes})。`;
-            } else if (denyVotes >= approveVotes && (approveVotes > 0 || denyVotes > 0)) {
-                finalStatus = 'rejected';
-                decisionReason = `投票未通过 (赞成: ${approveVotes}, 反对: ${denyVotes})。`;
+            if (votes.length === 0) {
+                await processApplication(app.id, "投票超时，无人投票。", 'expired');
+            } else if (approveVotes > denyVotes) {
+                await processApplication(app.id, `投票结束 (赞成: ${approveVotes}, 反对: ${denyVotes})`, 'approved');
+            } else { // denyVotes >= approveVotes
+                await processApplication(app.id, `投票结束 (赞成: ${approveVotes}, 反对: ${denyVotes})`, 'rejected');
             }
-
-            await db.run("UPDATE subdomain_applications SET status = ?, admin_notes = ? WHERE id = ?", finalStatus, decisionReason, app.id);
-
-            const user = await db.get("SELECT email FROM users WHERE id = ?", app.user_id);
-            if (!user) continue;
-
-            if (finalStatus === 'approved') {
-                try {
-                    if (app.request_type === 'create') {
-                        const cfPayload = { type: app.record_type, name: app.subdomain, content: app.record_value, ttl: 3600, proxied: false };
-                        const { data: cfResponse } = await cfApi.post('dns_records', cfPayload);
-                        await db.run('INSERT INTO dns_records (id, user_id, type, name, content) VALUES (?, ?, ?, ?, ?)', cfResponse.result.id, app.user_id, app.record_type, app.subdomain, app.record_value);
-                    } else if (app.request_type === 'update') {
-                        const oldRecord = await db.get("SELECT * FROM dns_records WHERE id = ?", app.target_dns_record_id);
-                        if (oldRecord) {
-                            const cfPayload = { type: app.record_type, name: app.subdomain, content: app.record_value, ttl: 3600, proxied: false };
-                            await cfApi.put(`dns_records/${oldRecord.id}`, cfPayload);
-                            await db.run('UPDATE dns_records SET type = ?, name = ?, content = ? WHERE id = ?', app.record_type, app.subdomain, app.record_value, app.target_dns_record_id);
-                        }
-                    }
-                    await sendEmail(user.email, `您的域名申请已批准: ${app.subdomain}`, getApplicationApprovedEmail(app.subdomain));
-                } catch (error) {
-                    console.error(`Cloudflare API op failed for approved app ${app.id}:`, error.response ? error.response.data : error.message);
-                    await db.run("UPDATE subdomain_applications SET status = 'error', admin_notes = ? WHERE id = ?", "Cloudflare操作失败", app.id);
-                    await sendEmail(user.email, `您的域名申请处理失败: ${app.subdomain}`, getApplicationRejectedEmail(app.subdomain, "后台Cloudflare操作失败，请联系管理员。"));
-                    decisionReason = "❌ 投票通过但Cloudflare操作失败！";
-                }
-            }
-            else if (finalStatus === 'rejected') {
-                await sendEmail(user.email, `您的域名申请已被拒绝: ${app.subdomain}`, getApplicationRejectedEmail(app.subdomain, decisionReason));
-            } else if (finalStatus === 'expired') {
-                await sendEmail(user.email, `您的域名申请已过期: ${app.subdomain}`, getApplicationExpiredEmail(app.subdomain));
-            }
-
-            const originalMessage = await formatApplicationMessage(app, votes);
-            const finalMessage = originalMessage + `\n*处理结果: ${decisionReason}*`;
-            if (app.telegram_message_id) {
-                await editTelegramMessage(TELEGRAM_GROUP_CHAT_ID, app.telegram_message_id, finalMessage, { reply_markup: {} });
-            }
-            console.log(`Application ${app.id} processed with status: ${finalStatus}`);
         }
     });
 }
