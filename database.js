@@ -76,10 +76,19 @@ async function initializeDatabase() {
             }
         });
 
-        // --- dns_records table (no changes needed, but ensure it exists) ---
+        // --- dns_records table (with migration) ---
+        const dnsRecordsInfo = await db.all("PRAGMA table_info(dns_records);").catch(() => []);
+        const idColumn = dnsRecordsInfo.find(col => col.name === 'id');
+
+        if (idColumn && idColumn.type === 'INTEGER') {
+            console.log("Migrating dns_records table schema (INTEGER -> TEXT). This will delete existing records.");
+            await db.exec('DROP TABLE dns_records;');
+            console.log("Old dns_records table dropped.");
+        }
+
         await db.exec(`
             CREATE TABLE IF NOT EXISTS dns_records (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id TEXT PRIMARY KEY,
                 user_id INTEGER NOT NULL,
                 type TEXT NOT NULL,
                 name TEXT NOT NULL,
@@ -91,13 +100,22 @@ async function initializeDatabase() {
             );
         `);
 
-        // --- subdomain_applications table ---
+        // --- subdomain_applications table (with migration) ---
+        const appInfo = await db.all("PRAGMA table_info(subdomain_applications);").catch(() => []);
+        const targetIdColumn = appInfo.find(col => col.name === 'target_dns_record_id');
+
+        if (targetIdColumn && targetIdColumn.type === 'INTEGER') {
+            console.log("Migrating subdomain_applications table schema (target_dns_record_id INTEGER -> TEXT). This will delete existing applications.");
+            await db.exec('DROP TABLE subdomain_applications;');
+            console.log("Old subdomain_applications table dropped.");
+        }
+
         await db.exec(`
             CREATE TABLE IF NOT EXISTS subdomain_applications (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
                 request_type TEXT NOT NULL, -- 'create' or 'update'
-                target_dns_record_id INTEGER, -- NULL for 'create', references dns_records.id for 'update'
+                target_dns_record_id TEXT, -- NULL for 'create', references dns_records.id for 'update'
                 subdomain TEXT NOT NULL,
                 record_type TEXT NOT NULL, -- 'A' or 'CNAME'
                 record_value TEXT NOT NULL,

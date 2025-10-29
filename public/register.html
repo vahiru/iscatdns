@@ -37,6 +37,11 @@
                     <!-- Cloudflare Turnstile Widget -->
                     <div id="turnstile-widget" class="mb-3"></div>
 
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="agreementCheck" required>
+                        <label class="form-check-label" for="agreementCheck">我已阅读并同意 <a href="/EULA.html" target="_blank">最终用户许可协议</a> 和 <a href="/privacy.html" target="_blank">隐私政策</a></label>
+                    </div>
+
                     <button type="button" class="btn btn-secondary w-100" onclick="handleFormSubmit('registerForm', '/register');">注册</button>
                 </div>
                 <div class="text-center mt-3">
