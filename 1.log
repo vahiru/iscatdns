@@ -1,36 +1,28 @@
-Running cron job: processing finished applications...
-Running cron job: processing finished applications...
-Cloudflare API op failed for approved app 3: {
-  result: null,
-  success: false,
-  errors: [
-    { code: 9208, message: 'Failed to parse. proxied must be a bool.' }
-  ],
-  messages: []
-}
-Message sent: <338367fe-a080-1790-7dc8-911c526dfd95@is-cute.cat>
-Application 3 processed with status: approved
-"C:\Users\str123\Downloads\AyuGram Desktop\_.env"Running cron job: processing finished applications...
-Cloudflare API op failed for approved app 2: {
-  result: null,
-  success: false,
-  errors: [
-    { code: 9208, message: 'Failed to parse. proxied must be a bool.' }
-  ],
-  messages: []
-}
-Message sent: <e681459a-475d-e393-b205-c5ca5324bcb5@is-cute.cat>
-Application 2 processed with status: approved
-Running cron job: processing finished applications...
-Message sent: <6f6a06d2-82da-e0cf-be9d-84a62194eabe@is-cute.cat>
-Cloudflare API op failed for approved app 4: {
-  result: null,
-  success: false,
-  errors: [
-    { code: 9208, message: 'Failed to parse. proxied must be a bool.' }
-  ],
-  messages: []
-}
-Message sent: <8c7c0d08-79ae-e014-27f7-17e9d4baf518@is-cute.cat>
-Application 4 processed with status: approved
-Running cron job: processing finished applications...
+正在 Ping tset.is-cute.cat [192.168.1.1] 具有 32 字节的数据:
+请求超时。
+
+192.168.1.1 的 Ping 统计信息:
+    数据包: 已发送 = 1，已接收 = 0，丢失 = 1 (100% 丢失)，
+Control-C
+PS C:\Users\str123> ping tset.is-cute.cat.is-cute.cat
+
+正在 Ping tset.is-cute.cat.is-cute.cat [192.168.1.2] 具有 32 字节的数据:
+请求超时。
+
+
+新域名申请
+----------------------------------------
+申请人: vahiru
+域名: tset.is-cute.cat.is-cute.cat
+类型: A
+值: 192.168.1.2
+TTL: 3600
+代理: 否
+用途: 更新记录 ID: 8e805fd316c4fe0552b620cc77b864ba
+状态: approved
+投票截止: 2025/10/30 15:19:37
+
+赞成票: 2 (vahiru, Yuki)
+反对票: 0 (无)
+
+处理结果: 快速通道批准 (赞成: 2, 反对: 0)

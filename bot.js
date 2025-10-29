@@ -43,7 +43,7 @@ async function formatApplicationMessage(application, votes = []) {
     const denyVoterUsernames = await Promise.all(denyVotes.map(v => getTelegramUsername(v.admin_telegram_user_id)));
 
     return `
-*${application.request_type === 'create' ? '新域名申请' : '域名更新请求'}*
+*${application.request_type.trim().toLowerCase() === 'create' ? '新域名申请' : '域名更新请求'}*
 ----------------------------------------
 *申请人*: ${application.username}
 *域名*: ${fullDomain}

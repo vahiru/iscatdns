@@ -407,6 +407,10 @@ async function main() {
         if (subdomain === '@' || subdomain === '') {
             return PARENT_DOMAIN.toLowerCase();
         }
+        // Check if the subdomain already contains the parent domain
+        if (subdomain.toLowerCase().endsWith(`.${PARENT_DOMAIN.toLowerCase()}`)) {
+            return subdomain.toLowerCase();
+        }
         return `${subdomain}.${PARENT_DOMAIN}`.toLowerCase();
     };
 
