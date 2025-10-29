@@ -72,7 +72,7 @@ async function processApplication(applicationId, decisionReason, finalStatus) {
     if (finalStatus === 'approved') {
         try {
             const fullDomain = app.subdomain;
-            const cfPayload = { type: app.record_type, name: fullDomain, content: app.record_value, ttl: app.ttl, proxied: app.proxied };
+            const cfPayload = { type: app.record_type, name: fullDomain, content: app.record_value, ttl: app.ttl, proxied: !!app.proxied };
 
             if (app.request_type === 'create') {
                 const { data: cfResponse } = await cfApi.post('dns_records', cfPayload);

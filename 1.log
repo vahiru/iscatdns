@@ -1,27 +1,36 @@
-Bot received message: {
-  "message_id": 8,
-  "from": {
-    "id": 6465508212,
-    "is_bot": false,
-    "first_name": "vahiru",
-    "last_name": "| 重度失眠",
-    "username": "vahiru",
-    "language_code": "zh-hans"
-  },
-  "chat": {
-    "id": 6465508212,
-    "first_name": "vahiru",
-    "last_name": "| 重度失眠",
-    "username": "vahiru",
-    "type": "private"
-  },
-  "date": 1761427386,
-  "text": "/bind 53b129c6924f6067a4bb457c363c76c8",
-  "entities": [
-    {
-      "offset": 0,
-      "length": 5,
-      "type": "bot_command"
-    }
-  ]
+Running cron job: processing finished applications...
+Running cron job: processing finished applications...
+Cloudflare API op failed for approved app 3: {
+  result: null,
+  success: false,
+  errors: [
+    { code: 9208, message: 'Failed to parse. proxied must be a bool.' }
+  ],
+  messages: []
 }
+Message sent: <338367fe-a080-1790-7dc8-911c526dfd95@is-cute.cat>
+Application 3 processed with status: approved
+"C:\Users\str123\Downloads\AyuGram Desktop\_.env"Running cron job: processing finished applications...
+Cloudflare API op failed for approved app 2: {
+  result: null,
+  success: false,
+  errors: [
+    { code: 9208, message: 'Failed to parse. proxied must be a bool.' }
+  ],
+  messages: []
+}
+Message sent: <e681459a-475d-e393-b205-c5ca5324bcb5@is-cute.cat>
+Application 2 processed with status: approved
+Running cron job: processing finished applications...
+Message sent: <6f6a06d2-82da-e0cf-be9d-84a62194eabe@is-cute.cat>
+Cloudflare API op failed for approved app 4: {
+  result: null,
+  success: false,
+  errors: [
+    { code: 9208, message: 'Failed to parse. proxied must be a bool.' }
+  ],
+  messages: []
+}
+Message sent: <8c7c0d08-79ae-e014-27f7-17e9d4baf518@is-cute.cat>
+Application 4 processed with status: approved
+Running cron job: processing finished applications...
