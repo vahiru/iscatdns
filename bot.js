@@ -70,15 +70,17 @@ async function processApplication(applicationId, decisionReason, finalStatus) {
     if (finalStatus === 'approved') {
         try {
             if (app.request_type === 'create') {
-                const cfPayload = { type: app.record_type, name: app.subdomain, content: app.record_value, ttl: 3600, proxied: false };
+                const fullDomain = `${app.subdomain}.${PARENT_DOMAIN}`;
+                const cfPayload = { type: app.record_type, name: fullDomain, content: app.record_value, ttl: 3600, proxied: false };
                 const { data: cfResponse } = await cfApi.post('dns_records', cfPayload);
-                await db.run('INSERT INTO dns_records (id, user_id, type, name, content) VALUES (?, ?, ?, ?, ?)', cfResponse.result.id, app.user_id, app.record_type, app.subdomain, app.record_value);
+                await db.run('INSERT INTO dns_records (id, user_id, type, name, content) VALUES (?, ?, ?, ?, ?)', cfResponse.result.id, app.user_id, app.record_type, fullDomain, app.record_value);
             } else if (app.request_type === 'update') {
                 const oldRecord = await db.get("SELECT * FROM dns_records WHERE id = ?", app.target_dns_record_id);
                 if (oldRecord) {
-                    const cfPayload = { type: app.record_type, name: app.subdomain, content: app.record_value, ttl: 3600, proxied: false };
+                    const fullDomain = `${app.subdomain}.${PARENT_DOMAIN}`;
+                    const cfPayload = { type: app.record_type, name: fullDomain, content: app.record_value, ttl: 3600, proxied: false };
                     await cfApi.put(`dns_records/${oldRecord.id}`, cfPayload);
-                    await db.run('UPDATE dns_records SET type = ?, name = ?, content = ? WHERE id = ?', app.record_type, app.subdomain, app.record_value, app.target_dns_record_id);
+                    await db.run('UPDATE dns_records SET type = ?, name = ?, content = ? WHERE id = ?', app.record_type, fullDomain, app.record_value, app.target_dns_record_id);
                 }
             }
             await sendEmail(user.email, `您的域名申请已批准: ${app.subdomain}`, getApplicationApprovedEmail(app.subdomain));
