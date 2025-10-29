@@ -130,6 +130,16 @@ async function initializeDatabase() {
             );
         `);
 
+        // Add ttl and proxied columns to subdomain_applications if they don't exist
+        await db.all(`PRAGMA table_info(subdomain_applications)`).then(async columns => {
+            if (!columns.some(col => col.name === 'ttl')) {
+                await db.exec(`ALTER TABLE subdomain_applications ADD COLUMN ttl INTEGER DEFAULT 3600;`);
+            }
+            if (!columns.some(col => col.name === 'proxied')) {
+                await db.exec(`ALTER TABLE subdomain_applications ADD COLUMN proxied BOOLEAN DEFAULT FALSE;`);
+            }
+        });
+
         // --- application_votes table ---
         await db.exec(`
             CREATE TABLE IF NOT EXISTS application_votes (

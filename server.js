@@ -321,6 +321,11 @@ async function main() {
         });
     });
 
+    // New endpoint to check login status
+    app.get('/api/check-login-status', (req, res) => {
+        res.status(200).json({ isLoggedIn: req.session.isLoggedIn === true });
+    });
+
     // Public abuse report page
     app.get('/report-abuse', (req, res) => {
         res.sendFile(path.join(__dirname, 'public', 'report-abuse.html'));
@@ -423,7 +428,7 @@ async function main() {
 
     // 提交新的 DNS 记录申请
     app.post('/api/dns/records', async (req, res) => {
-        const { type, name, content, purpose } = req.body;
+        const { type, name, content, purpose, ttl, proxied } = req.body;
         if (!type || !name || !content) {
             return res.status(400).json({ message: '类型、名称和内容不能为空。' });
         }
@@ -436,8 +441,8 @@ async function main() {
 
         try {
             const result = await db.run(
-                'INSERT INTO subdomain_applications (user_id, request_type, subdomain, record_type, record_value, purpose, voting_deadline_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                req.session.userId, 'create', fullDomain, type, content, purpose, votingDeadline.toISOString()
+                'INSERT INTO subdomain_applications (user_id, request_type, subdomain, record_type, record_value, purpose, ttl, proxied, voting_deadline_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                req.session.userId, 'create', fullDomain, type, content, purpose, parseInt(ttl) || 3600, proxied === true, votingDeadline.toISOString()
             );
             const applicationId = result.lastID;
             const newApplication = await db.get("SELECT sa.*, u.username, u.email FROM subdomain_applications sa JOIN users u ON sa.user_id = u.id WHERE sa.id = ?", applicationId);
@@ -455,7 +460,10 @@ async function main() {
     // 提交更新 DNS 记录申请
     app.put('/api/dns/records/:id', async (req, res) => {
         const { id } = req.params; // id of the dns_records entry
-        const { type, name, content, purpose } = req.body;
+        const { type, name, content, purpose, ttl, proxied } = req.body;
+        const parsedTtl = parseInt(ttl) || 3600;
+        const parsedProxied = proxied === true;
+
         if (!type || !name || !content) {
             return res.status(400).json({ message: '类型、名称和内容不能为空。' });
         }
@@ -464,28 +472,40 @@ async function main() {
         }
 
         try {
-            // Verify record belongs to user
             const existingRecord = await db.get('SELECT * FROM dns_records WHERE id = ? AND user_id = ?', id, req.session.userId);
             if (!existingRecord) {
                 return res.status(403).json({ message: '无权修改此记录或记录不存在。' });
             }
 
             const fullDomain = getFullDomain(name);
-            const votingDeadline = new Date(Date.now() + VOTING_DURATION_HOURS * 60 * 60 * 1000);
 
-            const result = await db.run(
-                'INSERT INTO subdomain_applications (user_id, request_type, target_dns_record_id, subdomain, record_type, record_value, purpose, voting_deadline_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                req.session.userId, 'update', id, fullDomain, type, content, purpose, votingDeadline.toISOString()
-            );
-            const applicationId = result.lastID;
-            const newApplication = await db.get("SELECT sa.*, u.username, u.email FROM subdomain_applications sa JOIN users u ON sa.user_id = u.id WHERE sa.id = ?", applicationId);
+            // Check if only TTL or proxied status has changed
+            const coreInfoChanged = existingRecord.type !== type || existingRecord.name !== fullDomain || existingRecord.content !== content;
+            const nonCoreInfoChanged = existingRecord.ttl !== parsedTtl || existingRecord.proxied !== parsedProxied;
 
-            await sendApplicationNotification(newApplication);
-            await sendEmail(req.user.email, `您的域名更新申请已提交: ${fullDomain}`, getApplicationConfirmationEmail(fullDomain, purpose));
+            if (!coreInfoChanged && nonCoreInfoChanged) {
+                // --- Direct Update Logic ---
+                const cfPayload = { type: type, name: fullDomain, content: content, ttl: parsedTtl, proxied: parsedProxied };
+                await cfApi.put(`dns_records/${existingRecord.id}`, cfPayload);
+                await db.run('UPDATE dns_records SET ttl = ?, proxied = ? WHERE id = ?', parsedTtl, parsedProxied, id);
+                return res.status(200).json({ message: '记录的TTL/代理状态已立即更新。' });
+            } else {
+                // --- Approval Workflow Logic ---
+                const votingDeadline = new Date(Date.now() + VOTING_DURATION_HOURS * 60 * 60 * 1000);
+                const result = await db.run(
+                    'INSERT INTO subdomain_applications (user_id, request_type, target_dns_record_id, subdomain, record_type, record_value, purpose, ttl, proxied, voting_deadline_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    req.session.userId, 'update', id, fullDomain, type, content, purpose, parsedTtl, parsedProxied, votingDeadline.toISOString()
+                );
+                const applicationId = result.lastID;
+                const newApplication = await db.get("SELECT sa.*, u.username, u.email FROM subdomain_applications sa JOIN users u ON sa.user_id = u.id WHERE sa.id = ?", applicationId);
 
-            res.status(202).json({ message: '域名更新申请已提交，等待管理员审批。' });
+                await sendApplicationNotification(newApplication);
+                await sendEmail(req.user.email, `您的域名更新申请已提交: ${fullDomain}`, getApplicationConfirmationEmail(fullDomain, purpose));
+
+                return res.status(202).json({ message: '域名更新申请已提交，等待管理员审批。' });
+            }
         } catch (error) {
-            console.error("提交域名更新申请失败:", error);
+            console.error("提交域名更新申请失败:", error.response ? error.response.data : error.message);
             res.status(500).json({ message: '提交申请失败。' });
         }
     });

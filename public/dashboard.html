@@ -77,6 +77,18 @@
                         <label for="appRecordContent" class="form-label">内容 (IP 地址/目标)</label>
                         <input type="text" class="form-control" id="appRecordContent" name="content" placeholder="例如: 192.168.1.1 或 example.com" required>
                     </div>
+                    <div class="row g-3 mt-1">
+                        <div class="col-md-4">
+                            <label for="appRecordTTL" class="form-label">TTL</label>
+                            <input type="number" class="form-control" id="appRecordTTL" name="ttl" value="3600" required>
+                        </div>
+                        <div class="col-md-4 d-flex align-items-center">
+                            <div class="form-check form-switch mt-4">
+                                <input class="form-check-input" type="checkbox" role="switch" id="appRecordProxied" name="proxied">
+                                <label class="form-check-label" for="appRecordProxied">通过Cloudflare代理 (小黄云)</label>
+                            </div>
+                        </div>
+                    </div>
                     <div class="col-12">
                         <label for="appPurpose" class="form-label">申请用途 (必填)</label>
                         <textarea class="form-control" id="appPurpose" name="purpose" rows="3" placeholder="请详细说明您申请此域名的用途，这将有助于管理员审批。" required></textarea>

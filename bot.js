@@ -46,9 +46,15 @@ async function formatApplicationMessage(application, votes = []) {
 *${application.request_type === 'create' ? '新域名申请' : '域名更新请求'}*
 ----------------------------------------
 *申请人*: ${application.username}
-*域名*: \`${fullDomain}\`
-*类型*: \`${application.record_type}\`
-*值*: \`${application.record_value}\`
+*域名*: 
+${fullDomain}
+*类型*: 
+${application.record_type}
+*值*: 
+${application.record_value}
+*TTL*: 
+${application.ttl}
+*代理*: ${application.proxied ? '是' : '否'}
 *用途*: ${application.purpose || '无'}
 *状态*: ${application.status}
 *投票截止*: ${deadline}
@@ -69,18 +75,17 @@ async function processApplication(applicationId, decisionReason, finalStatus) {
 
     if (finalStatus === 'approved') {
         try {
+            const fullDomain = app.subdomain;
+            const cfPayload = { type: app.record_type, name: fullDomain, content: app.record_value, ttl: app.ttl, proxied: app.proxied };
+
             if (app.request_type === 'create') {
-                const fullDomain = app.subdomain; // Corrected: app.subdomain is already the full domain
-                const cfPayload = { type: app.record_type, name: fullDomain, content: app.record_value, ttl: 3600, proxied: false };
                 const { data: cfResponse } = await cfApi.post('dns_records', cfPayload);
-                await db.run('INSERT INTO dns_records (id, user_id, type, name, content) VALUES (?, ?, ?, ?, ?)', cfResponse.result.id, app.user_id, app.record_type, fullDomain, app.record_value);
+                await db.run('INSERT INTO dns_records (id, user_id, type, name, content, ttl, proxied) VALUES (?, ?, ?, ?, ?, ?, ?)', cfResponse.result.id, app.user_id, app.record_type, fullDomain, app.record_value, app.ttl, app.proxied);
             } else if (app.request_type === 'update') {
                 const oldRecord = await db.get("SELECT * FROM dns_records WHERE id = ?", app.target_dns_record_id);
                 if (oldRecord) {
-                    const fullDomain = app.subdomain; // Corrected: app.subdomain is already the full domain
-                    const cfPayload = { type: app.record_type, name: fullDomain, content: app.record_value, ttl: 3600, proxied: false };
                     await cfApi.put(`dns_records/${oldRecord.id}`, cfPayload);
-                    await db.run('UPDATE dns_records SET type = ?, name = ?, content = ? WHERE id = ?', app.record_type, fullDomain, app.record_value, app.target_dns_record_id);
+                    await db.run('UPDATE dns_records SET type = ?, name = ?, content = ?, ttl = ?, proxied = ? WHERE id = ?', app.record_type, fullDomain, app.record_value, app.ttl, app.proxied, app.target_dns_record_id);
                 }
             }
             await sendEmail(user.email, `您的域名申请已批准: ${app.subdomain}`, getApplicationApprovedEmail(app.subdomain));
@@ -98,7 +103,9 @@ async function processApplication(applicationId, decisionReason, finalStatus) {
 
     const votes = await getVotesForApplication(app.id);
     const originalMessage = await formatApplicationMessage(app, votes);
-    const finalMessage = originalMessage.replace(`*状态*: pending`, `*状态*: ${finalStatus}`) + `\n\n*处理结果: ${decisionReason}*`;
+    const finalMessage = originalMessage.replace(`*状态*: pending`, `*状态*: ${finalStatus}`) + `
+
+*处理结果: ${decisionReason}*`;
     if (app.telegram_message_id) {
         await editTelegramMessage(TELEGRAM_GROUP_CHAT_ID, app.telegram_message_id, finalMessage, {}); // Remove buttons
     }
@@ -231,10 +238,10 @@ function initializeBot(database, cloudflareApi, parentDomain, telegramGroupChatI
         { command: 'bind', description: '绑定您的Telegram账户: /bind <token>' },
     ]);
 
-    bot.onText(/\/start/, (msg) => bot.sendMessage(msg.chat.id, "欢迎使用 is-cute.cat DNS 管理机器人！"));
-    bot.onText(/\/help/, (msg) => bot.sendMessage(msg.chat.id, "您可以使用 /bind <token> 命令来绑定您的账户。"));
+    bot.onText(///start/, (msg) => bot.sendMessage(msg.chat.id, "欢迎使用 is-cute.cat DNS 管理机器人！"));
+    bot.onText(///help/, (msg) => bot.sendMessage(msg.chat.id, "您可以使用 /bind <token> 命令来绑定您的账户。"));
 
-    bot.onText(/\/bind\s*(.+)/, async (msg, match) => {
+    bot.onText(///bind\s*(.+)/, async (msg, match) => {
         const chatId = msg.chat.id;
         const telegramId = msg.from.id.toString();
         const token = match[1];
@@ -281,4 +288,3 @@ function initializeBot(database, cloudflareApi, parentDomain, telegramGroupChatI
 }
 
 module.exports = initializeBot;
-

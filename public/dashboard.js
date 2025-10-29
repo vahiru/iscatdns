@@ -120,7 +120,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <td>${record.ttl}</td>
                     <td>${record.proxied ? '是' : '否'}</td>
                     <td>
-                        <button class="btn btn-sm btn-warning edit-record-btn" data-id="${record.id}" data-type="${record.type}" data-name="${record.name}" data-content="${record.content}">修改</button>
+                        <button class="btn btn-sm btn-warning edit-record-btn" data-id="${record.id}" data-type="${record.type}" data-name="${record.name}" data-content="${record.content}" data-ttl="${record.ttl}" data-proxied="${record.proxied}">修改</button>
                         <button class="btn btn-sm btn-danger delete-record-btn" data-id="${record.id}">删除</button>
                     </td>
                 `;
@@ -276,9 +276,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         const formData = new FormData(applicationForm);
         const data = Object.fromEntries(formData.entries());
 
+        // Handle checkbox value
+        data.proxied = document.getElementById('appRecordProxied').checked;
+
+        const mode = applicationForm.dataset.mode;
+        const recordId = applicationForm.dataset.recordId;
+
+        const url = (mode === 'update' && recordId) ? `/api/dns/records/${recordId}` : '/api/dns/records';
+        const method = (mode === 'update' && recordId) ? 'PUT' : 'POST';
+
         try {
-            const response = await fetch('/api/dns/records', { // This endpoint now handles applications
-                method: 'POST',
+            const response = await fetch(url, {
+                method: method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             });
@@ -286,7 +295,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (response.ok) {
                 displayMessage('applicationFormMessage', result.message, true);
                 applicationForm.reset();
+                applicationForm.dataset.mode = 'create'; // Reset mode
+                applicationForm.dataset.recordId = '';
+                document.getElementById('applicationForm').querySelector('button[type="submit"]').textContent = '提交新的申请';
                 fetchMyApplications(); // Refresh user's applications
+                fetchMyDnsRecords(); // Also refresh DNS records
             } else {
                 displayMessage('applicationFormMessage', result.message || '提交申请失败。' + (result.error ? `: ${result.error}` : ''), false);
             }
@@ -296,34 +309,53 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // Edit Record (triggers update application)
+    // Delegated event listener for edit and delete buttons
     myDnsRecordsTableBody.addEventListener('click', async (event) => {
-        if (event.target.classList.contains('edit-record-btn')) {
-            const recordId = event.target.dataset.id;
-            const recordType = event.target.dataset.type;
-            const recordName = event.target.dataset.name;
-            const recordContent = event.target.dataset.content;
+        const target = event.target;
+
+        // --- Edit Record ---
+        if (target.classList.contains('edit-record-btn')) {
+            const recordId = target.dataset.id;
+            const recordType = target.dataset.type;
+            const fullDomain = target.dataset.name;
+            const recordContent = target.dataset.content;
+            const recordTtl = target.dataset.ttl;
+            const recordProxied = target.dataset.proxied === 'true';
+
+            // CORRECTED BUG FIX: Extract subdomain from the full domain name.
+            const parentDomain = 'is-cute.cat'; // This should be dynamically fetched or configured, but hardcoding for now.
+            const parentDomainSuffix = '.' + parentDomain;
+            let subdomain;
+
+            if (fullDomain === parentDomain) {
+                subdomain = '@';
+            } else {
+                subdomain = fullDomain.endsWith(parentDomainSuffix)
+                    ? fullDomain.slice(0, -parentDomainSuffix.length)
+                    : fullDomain;
+            }
 
             // Populate application form for update
             document.getElementById('appRecordType').value = recordType;
-            document.getElementById('appRecordName').value = recordName;
+            document.getElementById('appRecordName').value = subdomain; // Use corrected subdomain
             document.getElementById('appRecordContent').value = recordContent;
+            document.getElementById('appRecordTTL').value = recordTtl;
+            document.getElementById('appRecordProxied').checked = recordProxied;
             document.getElementById('appPurpose').value = `更新记录 ID: ${recordId}`; // Pre-fill purpose
 
-            // Change form to update mode (optional, for now just pre-fill)
+            // Change form to update mode
             applicationForm.dataset.mode = 'update';
             applicationForm.dataset.recordId = recordId;
             document.getElementById('applicationForm').querySelector('button[type="submit"]').textContent = '提交更新申请';
-            displayMessage('applicationFormMessage', '请填写用途并提交更新申请。' + (recordId ? ` (原记录ID: ${recordId})` : ''), true);
+            displayMessage('applicationFormMessage', '表单已填充旧记录信息，请修改并提交更新申请。', true);
             window.scrollTo({ top: document.getElementById('apply-subdomain').offsetTop, behavior: 'smooth' });
         }
-    });
 
-    // Delete Record (direct deletion)
-    myDnsRecordsTableBody.addEventListener('click', async (event) => {
-        if (event.target.classList.contains('delete-record-btn')) {
-            const recordId = event.target.dataset.id;
-            if (confirm('确定要删除此记录吗？此操作无法撤销。' + (recordId ? ` (记录ID: ${recordId})` : ''))) {
+        // --- Delete Record ---
+        if (target.classList.contains('delete-record-btn')) {
+            const recordId = target.dataset.id;
+            if (confirm(`确定要删除此记录吗？此操作无法撤销。
+(记录ID: ${recordId})`)) {
                 try {
                     const response = await fetch(`/api/dns/records/${recordId}`, {
                         method: 'DELETE'
