@@ -60,7 +60,13 @@ async function main() {
     });
 
     // Initialize Telegram Bot
-    const botFunctions = initializeBot(db, cfApi, PARENT_DOMAIN, TELEGRAM_GROUP_CHAT_ID, TELEGRAM_BOT_TOKEN);
+    let botFunctions;
+    try {
+        botFunctions = initializeBot(db, cfApi, PARENT_DOMAIN, TELEGRAM_GROUP_CHAT_ID, TELEGRAM_BOT_TOKEN);
+    } catch (e) {
+        console.error("Error initializing bot:", e);
+        process.exit(1);
+    }
     const { sendApplicationNotification, sendAbuseReportNotification, editTelegramMessage } = botFunctions;
 
 
